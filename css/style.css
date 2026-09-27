@@ -1933,3 +1933,53 @@ body.dicas-abertas .hint{ opacity:0; }
   display:none;
   background:#0b0d12;
 }
+
+/* ================== PILOTAR NO TELEFONE ==================
+   O SVG do guidao fica em z-index 1, por cima do canvas do jogo, e com
+   pointer-events ligado. No computador nunca importou -- joga-se com as
+   setas do teclado. No telefone o toque morria no SVG e nunca chegava no
+   canvas: nao dava pra desviar. O guidao e so desenho, entao ele deixa o
+   toque passar. */
+#scene-street .art--imersao{ pointer-events:none; }
+#game-canvas{ touch-action:none; }
+
+.setas-jogo{ display:none; }
+.setas-jogo[hidden]{ display:none; }
+
+.seta-jogo{
+  position:fixed; bottom:0; top:22%;
+  width:30vw; max-width:190px;
+  display:flex; align-items:center; justify-content:center;
+  z-index:76;
+  border:none; background:transparent;
+  color:rgba(255,255,255,.34);
+  -webkit-tap-highlight-color:transparent;
+  cursor:pointer;
+  transition:color .18s var(--ease), background .18s var(--ease);
+}
+.seta-jogo--esq{ left:0;  background:linear-gradient(to right, rgba(255,255,255,.055), transparent); }
+.seta-jogo--dir{ right:0; background:linear-gradient(to left,  rgba(255,255,255,.055), transparent); }
+.seta-jogo:active{ color:rgba(255,235,190,.95); }
+.seta-jogo--esq:active{ background:linear-gradient(to right, rgba(255,220,160,.20), transparent); }
+.seta-jogo--dir:active{ background:linear-gradient(to left,  rgba(255,220,160,.20), transparent); }
+
+/* so aparecem onde nao ha teclado */
+@media (pointer:coarse){
+  .setas-jogo:not([hidden]){ display:block; }
+}
+
+/* ---- o botao de voltar, no alto e discreto ----
+   Embaixo ele disputava espaco com o guidao e com o polegar de quem pilota. */
+@media (pointer:coarse){
+  body.is-imersao .back-btn{
+    top:.7rem; bottom:auto;
+    left:.7rem; right:auto;
+    padding:.34rem .7rem;
+    font-size:.56rem; letter-spacing:.14em;
+    opacity:.55;
+    background:rgba(5,8,15,.6);
+  }
+  body.is-imersao .back-btn:active{ opacity:1; }
+  /* a legenda da imersao sai do caminho do polegar esquerdo */
+  body.is-imersao .imersao-caption{ display:none; }
+}

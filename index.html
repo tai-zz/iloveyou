@@ -15,7 +15,7 @@
   }
 }
 </script>
-<link rel="stylesheet" href="css/style.css?v=93">
+<link rel="stylesheet" href="css/style.css?v=94">
 </head>
 <body>
 
@@ -5337,6 +5337,24 @@
   <div class="game-hud__nivel" id="game-nivel" aria-live="polite"></div>
 </div>
 
+<!-- Setas de pilotagem. No telefone nao ha teclado, e tocar no canvas
+     sozinho e imprecisao pura em cima de uma moto a 300 km/h. Duas areas
+     grandes nas laterais resolvem: encostou do lado, mudou de faixa. -->
+<div class="setas-jogo" id="setas-jogo" hidden aria-hidden="false">
+  <button class="seta-jogo seta-jogo--esq" id="seta-esq" type="button" aria-label="Ir pra faixa da esquerda">
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <path d="M15 4 L7 12 L15 20" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <button class="seta-jogo seta-jogo--dir" id="seta-dir" type="button" aria-label="Ir pra faixa da direita">
+    <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+      <path d="M9 4 L17 12 L9 20" fill="none" stroke="currentColor" stroke-width="2.4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>
+
 <div class="game-over" id="game-over" hidden>
   <h3 class="game-over__title">Capotou.</h3>
   <p class="game-over__score"><span id="game-final">0</span> metros</p>
@@ -5421,6 +5439,6 @@
 
 <div class="transition-veil" id="veil"></div>
 
-<script src="js/main.js?v=93"></script>
+<script src="js/main.js?v=94"></script>
 </body>
 </html>

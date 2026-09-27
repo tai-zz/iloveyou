@@ -2696,7 +2696,12 @@
     for (var i = 0; i < vagasVideo.length; i++) {
       var s = vagasVideo[i], v = s.video;
       var b = s.marca.getBoundingClientRect();
-      var aparece = s.cena === cena && b.width > 2 &&
+      /* Nao basta ser "o comodo da vez": tem que estar MESMO no ar. Antes de
+         entrar na casa, cenaAtual() ja devolve o quarto, e o video do quarto
+         aparecia por cima da fachada -- foi o que se viu no teste de telefone. */
+      var noAr = s.cena && s.cena.classList.contains('is-active') &&
+                 body.classList.contains('is-inside');
+      var aparece = noAr && s.cena === cena && b.width > 2 &&
                     b.bottom > 0 && b.top < window.innerHeight &&
                     b.right > 0 && b.left < window.innerWidth;
       if (!aparece) {
@@ -2873,6 +2878,7 @@
     var elPts   = $('#game-score');
     var elRec   = $('#game-best');
     var telaFim = $('#game-over');
+    var setas   = $('#setas-jogo');
     var elNivel = $('#game-nivel');
 
     function anunciarNivel(n) {
@@ -3716,6 +3722,22 @@
     var btnRe = $('#game-restart');
     if (btnRe) btnRe.addEventListener('click', function (ev) { ev.stopPropagation(); reset(); });
 
+    /* As setas do telefone. Vao no pointerdown, e nao no click: click so
+       dispara quando o dedo levanta, e numa moto a 300 km/h esse atraso e a
+       diferenca entre desviar e bater. */
+    function ligarSeta(id, d) {
+      var b = $(id);
+      if (!b) return;
+      b.addEventListener('pointerdown', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (morto) { reset(); return; }
+        irFaixa(d);
+      });
+    }
+    ligarSeta('#seta-esq', -1);
+    ligarSeta('#seta-dir', 1);
+
     return {
       // chamado ao entrar na garagem, pra os carros ja estarem prontos quando
       // o portao subir -- render WebGL no meio da corrida engasgaria o jogo
@@ -3727,6 +3749,7 @@
         prepararPista();
         reset();
         hud.hidden = false;
+        if (setas) setas.hidden = false;
         requestAnimationFrame(function () { hud.classList.add('is-visible'); });
         document.addEventListener('keydown', tecla);
         cv.addEventListener('pointerdown', apontar);
@@ -3741,6 +3764,7 @@
         document.removeEventListener('keydown', tecla);
         cv.removeEventListener('pointerdown', apontar);
         hud.classList.remove('is-visible');
+        if (setas) setas.hidden = true;
         setTimeout(function () { if (!rodando) hud.hidden = true; }, 600);
         telaFim.classList.remove('is-visible');
         telaFim.hidden = true;
@@ -3751,6 +3775,26 @@
   /* =========================================================
      8b. MERGULHO — entrar numa tela e virar cenário
      ========================================================= */
+  /* Rede de seguranca do som.
+
+     Cada fonte ja e desligada pelo seu proprio caminho, e no computador isso
+     funciona. No telefone apareceu som sobreposto ao entrar e ao sair da TV,
+     o que so acontece se alguma bandeira de estado saiu de sincronia -- e ai
+     o desligamento certo simplesmente nao e chamado.
+
+     Em vez de cacar qual bandeira desanda, aqui o silencio nao depende de
+     bandeira nenhuma: varre tudo que pode estar tocando e cala. Roda depois
+     dos desligamentos normais, entao o estado continua certo; isto so garante
+     que nada ficou tocando por tras. */
+  function calarTudo() {
+    $$('audio').forEach(function (a) { if (!a.paused) a.pause(); });
+    [videoAot, videoPiratas].forEach(function (v) {
+      if (v && !v.paused) v.pause();
+    });
+    try { Ronco.desligar(); } catch (e) {}
+    try { Moto.desligar(); } catch (e) {}
+  }
+
   function somDaImersao(chave, ligar) {
     if (chave === 'road') {
       somEstrada(ligar);
@@ -3758,9 +3802,18 @@
       if (vc) vc.hidden = !ligar;
     }
     if (chave === 'piratas') {
-      if (videoPiratas && videoPiratas.classList.contains('is-on')) {
-        if (ligar) { videoPiratas.muted = false; videoPiratas.play().catch(function () {}); }
-        else videoPiratas.pause();
+      /* Antes so tocava se a classe is-on ja tivesse chegado, e ela so chega
+         quando o arquivo carrega. No telefone o video grande nao carrega a
+         tempo, entao a cena abria muda e parada. Agora tenta tocar sempre; se
+         o navegador recusar, o catch segura. */
+      if (videoPiratas) {
+        if (ligar) {
+          videoPiratas.muted = false;
+          videoPiratas.play().catch(function () {
+            videoPiratas.muted = true;
+            videoPiratas.play().catch(function () {});
+          });
+        } else videoPiratas.pause();
       }
     }
     if (chave === 'street') {
@@ -3769,7 +3822,7 @@
       else       { Moto.desligar(); Jogo.parar(); }
     }
     if (chave === 'titans') {
-      if (videoAot && videoAot.classList.contains('is-on')) {
+      if (videoAot && videoAot.getAttribute('src')) {
         if (ligar) tocarVideo(!pausadoPelaAba);   // voltar da aba retoma de onde parou
         else { videoAot.pause(); somBtn.hidden = true; }
       } else {
@@ -3836,6 +3889,7 @@
 
       pararGatos();
       esconderUiDeComodo();
+      calarTudo();                 // nada do comodo atravessa pra dentro da imersao
       somDaImersao(chave, true);
       centralizarPanorama(para);
       document.title = 'Feliz Aniversário — ' + im.titulo;
@@ -3858,6 +3912,7 @@
     var im = IMERSOES[imersaoAtual];
     var de = $(im.sel);
     somDaImersao(imersaoAtual, false);
+    calarTudo();                   // nem a imersao atravessa pra fora
     backBtn.classList.remove('is-visible');
     veil.classList.add('is-on');
 
