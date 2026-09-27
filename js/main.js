@@ -1280,16 +1280,34 @@
 
   function somSala(ligar) {
     salaLigada = ligar;
-    if (ligar) { if (!faixaSala.tocar()) Beat.tocar(); }
-    else       { if (!faixaSala.pausar()) Beat.pausar(); }
+    /* Aqui morava um bug feio. A faixa em arquivo so nasce depois de um fetch,
+       entao quem liga o som cedo demais pega tocar() devolvendo false e o
+       sintetizador de reserva entra no lugar. Ate ai tudo bem -- o problema
+       era o desligar: "se pausar() falhou, pausa a reserva". Quando o arquivo
+       ja tinha chegado, pausar() devolvia true e a reserva NUNCA era parada.
+       Ela seguia tocando pra sempre, atravessando pra TV e pro banheiro, e o
+       botao de pausa nao a alcancava.
+       Agora as duas sao paradas sempre: pausar o que ja esta parado nao custa. */
+    if (ligar) {
+      if (!faixaSala.tocar()) Beat.tocar();
+      else Beat.pausar();          // o arquivo assumiu: a reserva sai de cena
+    } else {
+      faixaSala.pausar();
+      Beat.pausar();
+    }
     body.classList.toggle('is-playing', ligar);
     if (subEl) subEl.textContent = (faixaSala.pronta ? 'em loop' : '88 bpm') + (ligar ? ' · tocando' : ' · pausado');
   }
 
   /* som da estrada: idem, com o rock sintetizado como reserva */
   function somEstrada(ligar) {
-    if (ligar) { if (!faixaEstrada.tocar()) Rock.tocar(); }
-    else       { if (!faixaEstrada.pausar()) Rock.pausar(); }
+    if (ligar) {
+      if (!faixaEstrada.tocar()) Rock.tocar();
+      else Rock.pausar();
+    } else {
+      faixaEstrada.pausar();
+      Rock.pausar();
+    }
   }
 
   /* ---------------- controles de volume ----------------
@@ -1846,7 +1864,7 @@
         selo.className = 'peca__selo';
         selo.textContent = '3D';
         b.appendChild(selo);
-        miniaturaDoModelo(url3d, 300, 380).then(function (png) {
+        miniaturaDoModelo(url3d, 320, 420).then(function (png) {
           var img = new Image();
           img.className = 'peca__mini';
           img.alt = g.getAttribute('data-nome') || '';
@@ -1915,6 +1933,30 @@
     return geoCache[url];
   }
 
+  /* Devolve a memoria de um modelo. A estante tem catorze pecas; se todas
+     ficam carregadas, sao milhoes de triangulos parados na memoria so pra
+     terem virado uma imagem uma vez. No computador passa; no telefone
+     derruba a aba -- foi o que aconteceu no My Room. */
+  function descartarModelo(url) {
+    var p = geoCache[url];
+    if (!p) return;
+    delete geoCache[url];
+    p.then(function (berco) {
+      berco.traverse(function (o) {
+        if (!o.isMesh) return;
+        if (o.geometry) o.geometry.dispose();
+        var m = o.material;
+        if (Array.isArray(m)) m.forEach(function (x) { if (x.dispose) x.dispose(); });
+        else if (m && m.dispose) m.dispose();
+      });
+    }).catch(function () {});
+  }
+
+  /* O PNG de cada miniatura fica guardado. Assim o visor da estante reaproveita
+     o render que a prateleira ja fez, em vez de baixar os catorze modelos de
+     novo -- que era o mesmo estouro de memoria, so que na segunda tela. */
+  var miniCache = {};
+
   function luzesDe(THREE, cena) {
     cena.add(new THREE.HemisphereLight(0xdfe7f2, 0x241c2e, 1.0));
     var a = new THREE.DirectionalLight(0xfff1dc, 2.1); a.position.set(3, 5, 4);
@@ -1937,6 +1979,9 @@
   /* desenha um quadro so e devolve PNG: assim da pra ter varias miniaturas
      3D sem gastar um contexto WebGL pra cada card da grade */
   function miniaturaDoModelo(url, larg, alt, giroY, cor) {
+    var chave = url + '|' + larg + 'x' + alt + '|' +
+                (giroY === undefined ? 'p' : giroY) + '|' + (cor || '');
+    if (miniCache[chave]) return Promise.resolve(miniCache[chave]);
     return Promise.all([carregarTres(), carregarModelo(url)]).then(function (r) {
       var THREE = r[0][0], fonte = r[1];
       if (!rendMini) {
@@ -1980,7 +2025,9 @@
       enquadrar(THREE, cam, tam, larg / alt, 1.06);
 
       rendMini.render(cena, cam);
-      return rendMini.domElement.toDataURL('image/png');
+      var png = rendMini.domElement.toDataURL('image/png');
+      miniCache[chave] = png;
+      return png;
     });
   }
 
@@ -2175,9 +2222,10 @@
     if (estante3dFeita) return;
     estante3dFeita = true;
     var ns = 'http://www.w3.org/2000/svg';
+    var fila = [];
     $$('.af[data-modelo]').forEach(function (g) {
-      var c = caixaDaPeca(g);
-      var svg = g.ownerSVGElement;
+      var c = caixaDaPeca(g);      // medir antes de tirar da cena: getBBox de
+      var svg = g.ownerSVGElement; // elemento escondido devolve zero
       if (!svg) return;
       var marca = document.createComment('vaga de ' + (g.getAttribute('data-nome') || '?'));
       g.parentNode.insertBefore(marca, g.nextSibling);
@@ -2188,20 +2236,32 @@
         svg.insertBefore(cofre, svg.firstChild);
       }
       cofre.appendChild(g);        // o desenho continua no arquivo, so nao na cena
+      fila.push({ url: g.getAttribute('data-modelo'), c: c, marca: marca });
+    });
 
-      miniaturaDoModelo(g.getAttribute('data-modelo'), 320, 420).then(function (png) {
-        var alt = c.h, larg = alt * (320 / 420);
+    /* Um de cada vez, e cada um descartado assim que vira imagem. Antes os
+       catorze carregavam de uma vez e ficavam na memoria: seis milhoes de
+       triangulos parados, o que derrubava o navegador do telefone. Agora nunca
+       ha mais de um modelo carregado, custe o tempo que custar. */
+    (function proximo(i) {
+      if (i >= fila.length) return;
+      var it = fila[i];
+      miniaturaDoModelo(it.url, 320, 420).then(function (png) {
+        var alt = it.c.h, larg = alt * (320 / 420);
         var img = document.createElementNS(ns, 'image');
         img.setAttribute('href', png);
-        img.setAttribute('x', c.x + c.w / 2 - larg / 2);
-        img.setAttribute('y', c.y + c.h - alt);
+        img.setAttribute('x', it.c.x + it.c.w / 2 - larg / 2);
+        img.setAttribute('y', it.c.y + it.c.h - alt);
         img.setAttribute('width', larg);
         img.setAttribute('height', alt * 1.03);   // compensa a folga do render
         img.setAttribute('preserveAspectRatio', 'xMidYMax meet');
         img.setAttribute('class', 'af-3d');
-        marca.parentNode.insertBefore(img, marca);
-      }).catch(function () {});
-    });
+        it.marca.parentNode.insertBefore(img, it.marca);
+      }).catch(function () {}).then(function () {
+        descartarModelo(it.url);
+        proximo(i + 1);
+      });
+    })(0);
   }
 
   function abrirVitrine() {
@@ -3793,6 +3853,8 @@
     });
     try { Ronco.desligar(); } catch (e) {}
     try { Moto.desligar(); } catch (e) {}
+    try { Beat.pausar(); } catch (e) {}
+    try { Rock.pausar(); } catch (e) {}
   }
 
   function somDaImersao(chave, ligar) {
