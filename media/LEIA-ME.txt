@@ -1,0 +1,18 @@
+ARQUIVOS QUE VOCE PODE COLOCAR AQUI
+===================================
+
+Coloque os arquivos com EXATAMENTE estes nomes. Se o arquivo existir,
+o site usa ele. Se nao existir, cai automaticamente no que esta
+desenhado/sintetizado — nada quebra.
+
+  aot.mp4       -> o episodio. Toca em tela cheia quando clicar no
+                   monitor do quarto, no lugar da cena desenhada.
+                   Formato: mp4 (H.264). Entra em loop.
+
+  sala.mp3      -> a musica do aparelho de som da sala, no lugar do
+                   boom bap sintetizado. Entra em loop.
+
+  estrada.mp3   -> a musica que toca dirigindo o carro, no lugar do
+                   rock sintetizado. Entra em loop.
+
+Depois de copiar, e so recarregar a pagina.
