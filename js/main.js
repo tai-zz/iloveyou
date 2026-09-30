@@ -1654,7 +1654,7 @@
   var ALBUM = [
     'media/album/album-01.webp', 'media/album/album-02.webp',
     'media/album/album-03.webp', 'media/album/album-04.webp',
-    'media/album/album-05.webp', 'media/album/album-06.webp'
+    'media/album/album-05.webp'
   ];
 
   /* As fotos de nos dois, no album ao lado do retrato da familia, na sala */
@@ -2999,7 +2999,7 @@
     var FAIXAS = [-0.62, 0, 0.62];
     var POSTE_PASSO = 34;        // metros entre um poste e o proximo, alternando o lado
     var dist, vel, faixa, jogadorX, alvoX, carros, proxSpawn, morto, pontos, tremor, inclina;
-    var enfeites, proxPoste, proxEnfeite, proxPredio, ladoPoste;
+    var enfeites, proxPoste, proxEnfeite, ladoPoste;
     var degrau, ritmo;
     var recorde = 0;
     try { recorde = parseInt(localStorage.getItem('siteana-recorde') || '0', 10) || 0; } catch (e) {}
@@ -3228,16 +3228,9 @@
       { url: 'media/3d/poste.glb',  m: 8.2,  giro: 0,  cor: '#39414f', lampada: true },
       { url: 'media/3d/placa.glb',  m: 2.6,  giro: 0 },
       { url: 'media/3d/cone.glb',   m: 0.75, giro: -0.4 },
-      { url: 'media/3d/barril.glb', m: 1.15, giro: -0.4 },
-      /* Os quatro predios parisienses. Sao o fundo de tras de tudo: quinze a
-         dezessete metros, bem afastados, e por isso fecham o horizonte e dao a
-         sensacao de rua em vez de estrada no vazio. */
-      { url: 'media/3d/predio-p1.glb', m: 15.0, giro: -0.5, rw: 980, rh: 620 },
-      { url: 'media/3d/predio-p2.glb', m: 16.0, giro: -0.6, rw: 800, rh: 720 },
-      { url: 'media/3d/predio-p3.glb', m: 16.0, giro: -0.7, rw: 800, rh: 720 },
-      { url: 'media/3d/predio-p6.glb', m: 17.0, giro: -0.4, rw: 860, rh: 700 }
+      { url: 'media/3d/barril.glb', m: 1.15, giro: -0.4 }
     ];
-    var I_POSTE = 0, I_PRIMEIRO_PREDIO = 4;
+    var I_POSTE = 0;
     var artesEnfeite = [];
 
     function prepararCenario() {
@@ -3333,8 +3326,7 @@
       dist = 0; vel = VEL_INI;
       faixa = 1; jogadorX = 0; alvoX = FAIXAS[1];
       carros = []; proxSpawn = 30 * MUNDO; marchaAnt = 1;
-      enfeites = []; proxPoste = 20; proxEnfeite = 40;
-      proxPredio = 90; ladoPoste = 1;
+      enfeites = []; proxPoste = 20; proxEnfeite = 40; ladoPoste = 1;
       degrau = 0; ritmo = DEGRAUS[0].ritmo;
       if (elNivel) { elNivel.textContent = ''; elNivel.classList.remove('is-on'); }
       morto = false; pontos = 0; tremor = 0; inclina = 0;
@@ -3424,19 +3416,6 @@
            densidade que ja tinham -- some a gente, e so. */
         proxEnfeite = 12 + Math.random() * 30;
       }
-      /* O predio e o que sobrou do cenario de fundo: bem afastado e esparso,
-         ele fecha o horizonte e evita que a estrada pareca correr no vazio. */
-      proxPredio -= avanco;
-      if (proxPredio <= 0) {
-        var ladoB = Math.random() < 0.5 ? -1 : 1;
-        enfeites.push({
-          i: I_PRIMEIRO_PREDIO + Math.floor(Math.random() * (ENFEITES.length - I_PRIMEIRO_PREDIO)),
-          x: ladoB * (6.2 + Math.random() * 4.4),
-          z: Z_SPAWN, esp: Math.random() < 0.5
-        });
-        proxPredio = 62 + Math.random() * 120;
-      }
-
       for (var e = enfeites.length - 1; e >= 0; e--) {
         enfeites[e].z -= avanco;
         if (enfeites[e].z < -8) enfeites.splice(e, 1);
