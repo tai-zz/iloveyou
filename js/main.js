@@ -1639,20 +1639,51 @@
     a.hidden = true;
     a.setAttribute('data-faixa', url);
     document.body.appendChild(a);
-    var pronta = false, fade = null;
+    var pronta = false, fade = null, mexeVolume = null;
     a.addEventListener('canplaythrough', function () { pronta = true; });
     a.addEventListener('error', function () { pronta = false; });
 
+    /* O CELULAR NAO DEIXAVA A MUSICA PARAR.
+
+       No iPhone o site nao manda no volume de um <audio>: a atribuicao passa
+       sem erro nenhum e a leitura devolve sempre 1. O fade daqui andava ate a
+       LEITURA chegar no alvo --
+
+           var d = alvo - a.volume;
+           if (Math.abs(d) < 0.02) { clearInterval(fade); if (aoFim) aoFim(); }
+
+       -- e o a.pause() morava dentro dessa condicao, como aoFim. Com a leitura
+       cravada em 1, a condicao nunca acontecia: o intervalo girava pra sempre e
+       a musica nunca parava. A interface ate dizia "pausado", porque quem
+       mandou pausar seguiu em frente; so o som e que continuava. A musica da
+       sala atravessava a casa inteira, e o mesmo valia pro banheiro, pro my
+       room e pra estrada -- todos saem daqui.
+
+       Duas mudancas. O fade agora e tocado pelo RELOGIO e nao pela leitura:
+       dura DUR_FADE e acaba, tendo o volume obedecido ou nao, entao o aoFim
+       sempre roda. E antes disso pergunta se vale a pena: onde o volume nao
+       obedece, esperar o fade seria segurar a musica no volume cheio por mais
+       um quarto de segundo a toa -- melhor cortar na hora. */
+    var DUR_FADE = 260;
+
+    function podeVolume() {
+      if (mexeVolume === null) {
+        var antes = a.volume;
+        a.volume = antes > 0.5 ? 0.25 : 0.75;
+        mexeVolume = (a.volume !== antes);
+        a.volume = antes;
+      }
+      return mexeVolume;
+    }
+
     function irPara(alvo, aoFim) {
-      clearInterval(fade);
+      clearInterval(fade); fade = null;
+      if (!podeVolume()) { if (aoFim) aoFim(); return; }
+      var de = a.volume, t0 = Date.now();
       fade = setInterval(function () {
-        var d = alvo - a.volume;
-        if (Math.abs(d) < 0.02) {
-          a.volume = alvo; clearInterval(fade);
-          if (aoFim) aoFim();
-          return;
-        }
-        a.volume = Math.max(0, Math.min(1, a.volume + d * 0.14));
+        var k = Math.min(1, (Date.now() - t0) / DUR_FADE);
+        a.volume = Math.max(0, Math.min(1, de + (alvo - de) * k));
+        if (k >= 1) { clearInterval(fade); fade = null; if (aoFim) aoFim(); }
       }, 40);
     }
 
