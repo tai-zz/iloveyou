@@ -2999,7 +2999,7 @@
     var FAIXAS = [-0.62, 0, 0.62];
     var POSTE_PASSO = 34;        // metros entre um poste e o proximo, alternando o lado
     var dist, vel, faixa, jogadorX, alvoX, carros, proxSpawn, morto, pontos, tremor, inclina;
-    var enfeites, proxPoste, proxEnfeite, proxCasa, proxPredio, proxArvore, ladoPoste;
+    var enfeites, proxPoste, proxEnfeite, proxPredio, ladoPoste;
     var degrau, ritmo;
     var recorde = 0;
     try { recorde = parseInt(localStorage.getItem('siteana-recorde') || '0', 10) || 0; } catch (e) {}
@@ -3229,42 +3229,15 @@
       { url: 'media/3d/placa.glb',  m: 2.6,  giro: 0 },
       { url: 'media/3d/cone.glb',   m: 0.75, giro: -0.4 },
       { url: 'media/3d/barril.glb', m: 1.15, giro: -0.4 },
-      /* Oito pedestres. Cada um com um giro diferente, senao a beira da
-         estrada vira uma fila de gente olhando pro mesmo lado. */
-      { url: 'media/3d/pessoa-field_watcher.glb',           m: 1.78, giro: 0.6 },
-      { url: 'media/3d/pessoa-man_standing_and_hold.glb',   m: 1.76, giro: -0.5 },
-      { url: 'media/3d/pessoa-profile_of_a_man.glb',        m: 1.80, giro: 1.2 },
-      { url: 'media/3d/pessoa-winter_stroll.glb',           m: 1.70, giro: -1.1 },
-      { url: 'media/3d/pessoa-agent_in_style.glb',          m: 1.82, giro: 0.9 },
-      { url: 'media/3d/pessoa-elegant_in_white_dres.glb',   m: 1.72, giro: -0.8 },
-      { url: 'media/3d/pessoa-elegant_diva.glb',            m: 1.74, giro: 1.5 },
-      { url: 'media/3d/pessoa-contemplative_eleganc.glb',   m: 1.25, giro: 0.3 },
-
-      /* Casas. Vao longe da pista, atras do guard-rail, e por isso podem ser
-         altas de verdade -- e a altura em metros que faz o casario parecer
-         casario e nao maquete. Renderizam num quadro mais largo que os outros
-         enfeites porque casa e mais larga que alta. */
-      { url: 'media/3d/casa-chale.glb', m: 5.2, giro: -0.6, rw: 760, rh: 620 },
-      { url: 'media/3d/casa-01.glb',    m: 6.6, giro: -0.5, rw: 760, rh: 620 },
-      { url: 'media/3d/casa-lenha.glb', m: 9.5, giro: -0.7, rw: 880, rh: 620 },
-      { url: 'media/3d/casa-rosa.glb',  m: 4.5, giro: -0.9, rw: 700, rh: 640 },
-
       /* Os quatro predios parisienses. Sao o fundo de tras de tudo: quinze a
          dezessete metros, bem afastados, e por isso fecham o horizonte e dao a
          sensacao de rua em vez de estrada no vazio. */
       { url: 'media/3d/predio-p1.glb', m: 15.0, giro: -0.5, rw: 980, rh: 620 },
       { url: 'media/3d/predio-p2.glb', m: 16.0, giro: -0.6, rw: 800, rh: 720 },
       { url: 'media/3d/predio-p3.glb', m: 16.0, giro: -0.7, rw: 800, rh: 720 },
-      { url: 'media/3d/predio-p6.glb', m: 17.0, giro: -0.4, rw: 860, rh: 700 },
-
-      /* Arvores. Sao o enchimento principal: vem em ritmo apertado e ocupam a
-         faixa entre o guard-rail e as casas. */
-      { url: 'media/3d/arvore-1.glb',    m:  8.5, giro: -0.3, rw: 640, rh: 700 },
-      { url: 'media/3d/arvore-koks.glb', m:  9.5, giro: -0.8, rw: 640, rh: 700 },
-      { url: 'media/3d/arvore-dnd.glb',  m: 11.0, giro:  0.4, rw: 620, rh: 760 }
+      { url: 'media/3d/predio-p6.glb', m: 17.0, giro: -0.4, rw: 860, rh: 700 }
     ];
-    var I_POSTE = 0, I_PRIMEIRA_PESSOA = 4;
-    var I_PRIMEIRA_CASA = 12, I_PRIMEIRO_PREDIO = 16, I_PRIMEIRA_ARVORE = 20;
+    var I_POSTE = 0, I_PRIMEIRO_PREDIO = 4;
     var artesEnfeite = [];
 
     function prepararCenario() {
@@ -3360,8 +3333,8 @@
       dist = 0; vel = VEL_INI;
       faixa = 1; jogadorX = 0; alvoX = FAIXAS[1];
       carros = []; proxSpawn = 30 * MUNDO; marchaAnt = 1;
-      enfeites = []; proxPoste = 20; proxEnfeite = 40; proxCasa = 55;
-      proxPredio = 90; proxArvore = 16; ladoPoste = 1;
+      enfeites = []; proxPoste = 20; proxEnfeite = 40;
+      proxPredio = 90; ladoPoste = 1;
       degrau = 0; ritmo = DEGRAUS[0].ritmo;
       if (elNivel) { elNivel.textContent = ''; elNivel.classList.remove('is-on'); }
       morto = false; pontos = 0; tremor = 0; inclina = 0;
@@ -3436,50 +3409,28 @@
         var lado = Math.random() < 0.5 ? -1 : 1;
         var qual = Math.random();
         var i, x;
-        if (qual < 0.52) {                    // gente: agora mais da metade
-          i = I_PRIMEIRA_PESSOA + Math.floor(Math.random() * (I_PRIMEIRA_CASA - I_PRIMEIRA_PESSOA));
-          x = lado * (1.5 + Math.random() * 1.05);
-        } else if (qual < 0.66) {             // placa
+        if (qual < 0.29) {                    // placa
           i = 1; x = lado * (1.36 + Math.random() * 0.25);
-        } else if (qual < 0.86) {             // cone, quase no acostamento
+        } else if (qual < 0.71) {             // cone, quase no acostamento
           i = 2; x = lado * (1.14 + Math.random() * 0.14);
         } else {                              // barril
           i = 3; x = lado * (1.18 + Math.random() * 0.2);
         }
         enfeites.push({ i: i, x: x, z: Z_SPAWN, esp: Math.random() < 0.5 });
-        proxEnfeite = 6 + Math.random() * 15;
+        /* O intervalo dobrou junto com a saida da gente. A gente era 52% dos
+           sorteios: mantendo o intervalo antigo, a mesma quantidade de coisas
+           continuaria vindo e a beira da estrada viraria um cordao de cones.
+           Com o dobro do intervalo, placa, cone e barril ficam exatamente na
+           densidade que ja tinham -- some a gente, e so. */
+        proxEnfeite = 12 + Math.random() * 30;
       }
-      /* Tres ritmos diferentes, cada um na sua faixa de afastamento: arvore
-         perto e apertada, casa no meio, predio la atras e esparso. E isso que
-         monta profundidade -- se tudo viesse no mesmo ritmo e na mesma
-         distancia, viraria um paredao. */
-      proxArvore -= avanco;
-      if (proxArvore <= 0) {
-        var ladoA = Math.random() < 0.5 ? -1 : 1;
-        enfeites.push({
-          i: I_PRIMEIRA_ARVORE + Math.floor(Math.random() * (ENFEITES.length - I_PRIMEIRA_ARVORE)),
-          x: ladoA * (2.3 + Math.random() * 5.2),
-          z: Z_SPAWN, esp: Math.random() < 0.5
-        });
-        proxArvore = 9 + Math.random() * 17;
-      }
-
-      proxCasa -= avanco;
-      if (proxCasa <= 0) {
-        var ladoC = Math.random() < 0.5 ? -1 : 1;
-        enfeites.push({
-          i: I_PRIMEIRA_CASA + Math.floor(Math.random() * (I_PRIMEIRO_PREDIO - I_PRIMEIRA_CASA)),
-          x: ladoC * (3.1 + Math.random() * 3.3),
-          z: Z_SPAWN, esp: Math.random() < 0.5
-        });
-        proxCasa = 38 + Math.random() * 74;
-      }
-
+      /* O predio e o que sobrou do cenario de fundo: bem afastado e esparso,
+         ele fecha o horizonte e evita que a estrada pareca correr no vazio. */
       proxPredio -= avanco;
       if (proxPredio <= 0) {
         var ladoB = Math.random() < 0.5 ? -1 : 1;
         enfeites.push({
-          i: I_PRIMEIRO_PREDIO + Math.floor(Math.random() * (I_PRIMEIRA_ARVORE - I_PRIMEIRO_PREDIO)),
+          i: I_PRIMEIRO_PREDIO + Math.floor(Math.random() * (ENFEITES.length - I_PRIMEIRO_PREDIO)),
           x: ladoB * (6.2 + Math.random() * 4.4),
           z: Z_SPAWN, esp: Math.random() < 0.5
         });
