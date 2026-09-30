@@ -742,15 +742,35 @@
       { t: 24.20, hz: 290 }, { t: 24.40, hz: 310 }, { t: 24.60, hz: 335 },
       { t: 24.80, hz: 355 }, { t: 25.00, hz: 375 }, { t: 25.20, hz: 395 },
       { t: 28.40, hz: 405 }, { t: 28.60, hz: 415 }, { t: 28.80, hz: 425 },
-      { t: 29.00, hz: 430 }, { t: 29.40, hz: 440, topo: true }, { t: 29.80, hz: 450 },
-      { t: 30.00, hz: 455 },
-      /* As duas do topo vinham de 9,05 e 9,25 -- quase o mesmo audio, porque
-         se sobrepunham em 0,6 s. Alternar entre elas nao mudava nada e o
-         motor continuava soando travado. Agora vem de trechos separados da
-         gravacao, e a de cima tem 1,2 s: e o pedaco mais longo que a gravacao
-         segura no alto sem cair de giro. */
-      { t: 5.85, hz: 452, dur: 0.72, topo: true },
-      { t: 9.02, hz: 470, dur: 1.18, topo: true }
+      { t: 29.00, hz: 430 }, { t: 29.40, hz: 440 }, { t: 29.80, hz: 450 },
+      /* AS DUAS DO TOPO. No limitador o giro nao anda, entao escolher "a mais
+         proxima" devolveria sempre a mesma fatia e o motor soaria travado --
+         por isso ali a escolha passa a alternar, pra variar a TEXTURA.
+
+         Elas tem que ter a MESMA ALTURA, e e onde estava a buzina. Antes o
+         rodizio era entre 29,40 s, 5,85 s e 9,02 s. Medindo a altura real de
+         cada uma por casamento de pente harmonico no proprio arquivo:
+
+             29,40 s -> 445 Hz     5,85 s -> 450,5 Hz     9,02 s -> 472,5 Hz
+
+         A de 9,02 s esta 104 cents acima da primeira e 83 acima da segunda --
+         um semitom cheio. E o rodizio troca a cada 1,15 s, sem parar. O que se
+         ouvia era uma nota segurada dando um pulo de semitom e voltando, tres
+         vezes a cada tres segundos e meio: e exatamente assim que soa uma
+         buzina de dois tons. Nao era o motor, era o intervalo.
+
+         Ficaram as duas que estao a 23 cents uma da outra -- diferenca que nao
+         se ouve como nota. Vem de pontos bem separados da gravacao (30,0 s e
+         5,85 s), sem sobreposicao nenhuma, e com duracoes diferentes (0,33 e
+         0,61 s), entao a alternancia nao cai num compasso perceptivel.
+
+         A de 9,02 s saiu do banco de vez: como era a mais aguda de todas, a
+         escolha por proximidade tambem a pegava chegando no fim do velocimetro,
+         e era dali que vinha a buzina antes mesmo do limitador. Sem ela o motor
+         encosta o teto em 455 Hz em vez de 472 -- 6% mais grave no talo, que e
+         um preco pequeno perto de um semitom pulando sem parar. */
+      { t: 30.00, hz: 455, topo: true },
+      { t: 5.85, hz: 452, dur: 0.72, topo: true }
     ];
     var banco = null, ganhoMotor = null, tocando = -1, altas = [];
 
@@ -3427,6 +3447,18 @@
         if (c.z < -5) { carros.splice(i, 1); continue; }
         if (c.z < 1.5 * MUNDO && c.z > -0.8 * MUNDO && Math.abs(c.x - jogadorX) < 0.31) bater();
       }
+
+      /* bater() manda o motor cair pra marcha-lenta -- mas a linha abaixo roda
+         logo em seguida, na MESMA passada, e escrevia o giro por cima. Nas
+         passadas seguintes passo() ja sai no comeco, entao o ultimo valor
+         gravado ficava sendo o de antes da batida.
+
+         Medindo na tela de fim: o ponteiro nao caia, subia mais um pouco e
+         cravava em 14.011 rpm, e a marcha continuava em 5 em vez de voltar
+         pra 1. O motor ficava gritando perto do corte pra sempre. Se a batida
+         fosse na ultima marcha, o rodizio do limitador seguia correndo em
+         cima disso, sem ninguem pilotando. */
+      if (morto) return;
 
       var marchaNova = Moto.pilotar(vel * 3.6);
       if (marchaNova > marchaAnt) sacudirTroca();
