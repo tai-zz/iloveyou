@@ -15,9 +15,33 @@
   }
 }
 </script>
-<link rel="stylesheet" href="css/style.css?v=104">
+<link rel="stylesheet" href="css/style.css?v=109">
 </head>
-<body>
+<body class="tem-portao">
+
+<!-- ============================================================= -->
+<!-- O PORTAO - a senha, antes de tudo                             -->
+<!-- O jardim atras e desenhado em canvas (js/main.js, secao 0).   -->
+<!-- ============================================================= -->
+<div class="portao" id="portao">
+  <canvas class="portao__jardim" id="jardim-canvas" aria-hidden="true"></canvas>
+
+  <div class="portao__meio">
+    <!-- TROCAR A FRASE AQUI (so este trecho) -->
+    <p class="portao__frase" id="portao-frase">
+      Isso aqui ainda &eacute; pouco do que voc&ecirc; merece, amor.
+    </p>
+
+    <form class="portao__forma" id="portao-forma" autocomplete="off">
+      <label class="portao__rotulo" for="portao-senha">a senha</label>
+      <input class="portao__campo" id="portao-senha" type="password"
+             inputmode="text" autocomplete="off" autocapitalize="none"
+             spellcheck="false" aria-describedby="portao-erro">
+      <button class="portao__btn" type="submit">entrar</button>
+      <p class="portao__erro" id="portao-erro" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</div>
 
 <canvas id="snow-canvas"></canvas>
 
@@ -5464,6 +5488,6 @@
 
 <div class="transition-veil" id="veil"></div>
 
-<script src="js/main.js?v=104"></script>
+<script src="js/main.js?v=109"></script>
 </body>
 </html>

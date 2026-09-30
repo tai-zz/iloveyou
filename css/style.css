@@ -2118,3 +2118,114 @@ body.dicas-abertas .hint{ opacity:0; }
   /* o X de fechar precisa ganhar do gradiente da faixa direita */
   .lupa__fechar{ z-index:4; }
 }
+
+/* ================== O PORTAO: a senha, antes de tudo ==================
+   O jardim atras e canvas, nao DOM. O site de referencia monta o dele com
+   quase quatro mil animacoes de CSS em sete mil elementos -- num celular
+   isso sozinho pesa mais que a casa inteira deste site, que acabou de ser
+   baixada de 303 animacoes pra 50. Em canvas o mesmo jardim sai por um
+   punhado de desenhos por quadro, e as flores ainda viram sprite uma vez
+   so, na abertura, do jeito que o minigame ja faz com os modelos. */
+.portao{
+  position:fixed; inset:0; z-index:200;
+  display:grid; place-items:center;
+  background:#0b0b0f;
+  transition:opacity .9s var(--ease), visibility .9s;
+}
+.portao.is-aberto{ opacity:0; visibility:hidden; pointer-events:none; }
+
+.portao__jardim{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  display:block;
+}
+
+.portao__meio{
+  position:relative; z-index:2;
+  width:min(92vw, 30rem);
+  padding:0 1rem 12vh;          /* sobe do meio: o jardim cresce por baixo */
+  text-align:center;
+}
+
+.portao__frase{
+  margin:0 0 2rem;
+  font-family:var(--font-display, 'Cormorant Garamond', serif);
+  font-size:clamp(1.35rem, 4.6vw, 2.1rem);
+  line-height:1.4;
+  font-style:italic;
+  color:#f3ece2;
+  text-shadow:0 2px 18px rgba(0,0,0,.9), 0 0 42px rgba(0,0,0,.7);
+}
+
+.portao__forma{ display:grid; justify-items:center; gap:.7rem; }
+
+.portao__rotulo{
+  font-family:var(--font-ui, Inter, sans-serif);
+  font-size:.6rem; letter-spacing:.34em; text-transform:uppercase;
+  color:rgba(243,236,226,.5);
+}
+
+.portao__campo{
+  width:min(72vw, 13rem);
+  padding:.7rem .9rem;
+  text-align:center;
+  font-family:var(--font-ui, Inter, sans-serif);
+  font-size:1.05rem; letter-spacing:.42em; text-indent:.42em;
+  color:#f3ece2;
+  background:rgba(8,8,12,.62);
+  border:1px solid rgba(243,236,226,.26);
+  border-radius:11px;
+  -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  transition:border-color .3s var(--ease), box-shadow .3s var(--ease);
+}
+.portao__campo:focus{
+  outline:none;
+  border-color:rgba(255,190,200,.66);
+  box-shadow:0 0 0 4px rgba(255,190,200,.12);
+}
+
+.portao__btn{
+  margin-top:.2rem;
+  padding:.62rem 1.7rem;
+  font-family:var(--font-ui, Inter, sans-serif);
+  font-size:.66rem; letter-spacing:.26em; text-transform:uppercase;
+  color:#0b0b0f;
+  background:#f0dfe2;
+  border:none; border-radius:999px;
+  cursor:pointer;
+  transition:transform .25s var(--ease), background .25s var(--ease);
+}
+.portao__btn:hover, .portao__btn:focus-visible{
+  background:#fff; transform:translateY(-2px); outline:none;
+}
+.portao__btn:active{ transform:translateY(0); }
+
+.portao__erro{
+  min-height:1.1rem; margin:.1rem 0 0;
+  font-family:var(--font-ui, Inter, sans-serif);
+  font-size:.7rem; letter-spacing:.06em;
+  color:#ffb4b4;
+  opacity:0; transition:opacity .25s var(--ease);
+}
+.portao__erro.is-on{ opacity:1; }
+
+/* o tranco de quem errou */
+.portao__forma.is-errado{ animation:portaoNega .42s var(--ease); }
+@keyframes portaoNega{
+  0%,100%{ transform:translateX(0); }
+  18%{ transform:translateX(-9px); }
+  42%{ transform:translateX(8px); }
+  68%{ transform:translateX(-5px); }
+  88%{ transform:translateX(3px); }
+}
+
+/* enquanto o portao esta fechado, a casa atras nao gasta nada */
+body.tem-portao .scene *{ animation-play-state:paused; }
+
+@media (pointer:coarse){
+  .portao__campo{ font-size:1.05rem; padding:.85rem .9rem; }
+  .portao__btn{ min-height:44px; padding:.7rem 1.9rem; }
+}
+@media (prefers-reduced-motion:reduce){
+  .portao__forma.is-errado{ animation:none; }
+}

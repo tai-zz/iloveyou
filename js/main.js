@@ -39,6 +39,371 @@
     document.addEventListener(ev, acordarSom, { passive: true });
   });
 
+
+  /* =========================================================
+     0. O PORTAO — a senha, e o jardim que cresce atras dela
+
+     O jardim e canvas de proposito. O site que serviu de referencia monta
+     o dele em DOM: 7.209 elementos e 3.912 animacoes de CSS rodando ao
+     mesmo tempo -- num telefone isso sozinho pesa mais do que a casa
+     inteira daqui, que acabou de sair de 303 animacoes pra 50. Aqui cada
+     flor e desenhada UMA vez num sprite, na abertura, e dali em diante o
+     quadro e so colar sprite e riscar haste: a mesma receita do minigame.
+
+     A profundidade vem de tres planos. O de tras e pequeno, escuro e
+     desfocado; o do meio e nitido; o da frente e grande e desfocado de
+     novo. O desfoque tambem entra uma vez so, no sprite -- nunca por
+     quadro, que e o que custaria caro.
+     ========================================================= */
+  (function portao() {
+    var caixa = document.getElementById('portao');
+    var cv    = document.getElementById('jardim-canvas');
+    var forma = document.getElementById('portao-forma');
+    var campo = document.getElementById('portao-senha');
+    var erro  = document.getElementById('portao-erro');
+    if (!caixa || !forma || !campo || !cv) return;
+
+    var SENHA = 'r15';
+
+    /* ---------------- as flores, desenhadas uma vez ---------------- */
+    var PALETA = [
+      ['#f7c9d2', '#e79aab', '#fff3f5'],
+      ['#e58ba0', '#c96a82', '#ffd9e2'],
+      ['#faf3e6', '#e8d9c2', '#fffdf8'],
+      ['#f4b8c4', '#d98b9c', '#fde7ec'],
+      ['#ffd98a', '#e6b45c', '#fff1c9']
+    ];
+
+    function novaTela(l, a) {
+      var c = document.createElement('canvas');
+      c.width = l; c.height = a;
+      return c;
+    }
+
+    /* Rosa: cinco aneis de petalas, de fora pra dentro. Cada anel e menor,
+       tem menos petalas, gira um pouco em relacao ao de baixo e clareia --
+       e esse clareamento de fora pra dentro que da volume. Com anel demais
+       vira margarida chapada; com este escalonamento vira rosa. */
+    function desenharRosa(x, raio, cor) {
+      var aneis = 5;
+      for (var a = 0; a < aneis; a++) {
+        var k = a / (aneis - 1);
+        var r = raio * (1 - a * 0.165);
+        var n = 9 - a;
+        var giro = a * 0.38;
+        // a borda de fora e a mais escura; o miolo, o mais claro
+        x.fillStyle = a === 0 ? cor[1] : (a >= aneis - 2 ? cor[2] : cor[0]);
+        for (var i = 0; i < n; i++) {
+          x.save();
+          x.rotate(giro + (i / n) * Math.PI * 2);
+          x.beginPath();
+          // petala mais alta que larga e empurrada pra fora: elas se cobrem
+          x.ellipse(0, -r * 0.46, r * (0.40 - k * 0.09), r * (0.52 - k * 0.10),
+                    0, 0, Math.PI * 2);
+          x.fill();
+          x.restore();
+        }
+        // sombra fina por baixo do anel seguinte, pra separar as camadas
+        if (a < aneis - 1) {
+          x.fillStyle = 'rgba(90,40,55,.10)';
+          x.beginPath(); x.arc(0, 0, r * 0.62, 0, Math.PI * 2); x.fill();
+        }
+      }
+      x.fillStyle = cor[2];
+      x.beginPath(); x.arc(0, 0, raio * 0.13, 0, Math.PI * 2); x.fill();
+    }
+
+    /* girassol: miolo escuro e petalas pontudas em volta */
+    function desenharGirassol(x, raio) {
+      var n = 16;
+      x.fillStyle = '#f0c34e';
+      for (var i = 0; i < n; i++) {
+        x.save();
+        x.rotate((i / n) * Math.PI * 2);
+        x.beginPath();
+        x.moveTo(0, -raio * 0.34);
+        x.quadraticCurveTo(raio * 0.20, -raio * 0.74, 0, -raio);
+        x.quadraticCurveTo(-raio * 0.20, -raio * 0.74, 0, -raio * 0.34);
+        x.fill();
+        x.restore();
+      }
+      x.fillStyle = '#6b4526';
+      x.beginPath(); x.arc(0, 0, raio * 0.37, 0, Math.PI * 2); x.fill();
+      x.fillStyle = 'rgba(40,24,12,.55)';
+      x.beginPath(); x.arc(0, 0, raio * 0.23, 0, Math.PI * 2); x.fill();
+    }
+
+    /* Tulipa: um copo, nao uma roseta. Sao tres petalas -- a do meio inteira
+       e duas laterais que se dobram pra fora -- e a boca fica ACIMA do ponto
+       da haste, senao ela nasce enterrada. A lateral mais escura de um lado
+       so e o que da a volta do copo. */
+    function desenharTulipa(x, raio, cor) {
+      var l = raio * 0.70, a = raio * 1.04;
+      x.save();
+      x.translate(0, -a * 0.28);
+
+      // petala de tras, aparecendo entre as duas da frente
+      x.fillStyle = cor[1];
+      x.beginPath();
+      x.moveTo(0, a * 0.52);
+      x.quadraticCurveTo(-l * 0.98, a * 0.10, -l * 0.52, -a * 0.52);
+      x.quadraticCurveTo(0, -a * 0.18, l * 0.52, -a * 0.52);
+      x.quadraticCurveTo(l * 0.98, a * 0.10, 0, a * 0.52);
+      x.fill();
+
+      // as duas da frente, uma clara e uma um tom abaixo
+      x.fillStyle = cor[0];
+      x.beginPath();
+      x.moveTo(0, a * 0.52);
+      x.quadraticCurveTo(-l * 0.74, a * 0.06, -l * 0.30, -a * 0.46);
+      x.quadraticCurveTo(0, -a * 0.10, 0, a * 0.52);
+      x.fill();
+
+      x.fillStyle = cor[2];
+      x.beginPath();
+      x.moveTo(0, a * 0.52);
+      x.quadraticCurveTo(l * 0.70, a * 0.04, l * 0.26, -a * 0.44);
+      x.quadraticCurveTo(0, -a * 0.10, 0, a * 0.52);
+      x.fill();
+
+      // o vinco do meio, que separa as duas da frente
+      x.strokeStyle = 'rgba(120,60,75,.18)';
+      x.lineWidth = Math.max(1, raio * 0.045);
+      x.beginPath();
+      x.moveTo(0, a * 0.50);
+      x.quadraticCurveTo(0, -a * 0.10, 0, -a * 0.44);
+      x.stroke();
+      x.restore();
+    }
+
+    /* Botao ainda fechado. Como elipse em pe com uma bola verde embaixo ele
+       saia parecendo ovo; o que faz parecer botao e a PONTA em cima e as
+       folhas do calice subindo pelos lados, abracando a base. */
+    function desenharBotao(x, raio, cor) {
+      var l = raio * 0.34, a = raio * 0.78;
+      x.save();
+      x.translate(0, -a * 0.18);
+
+      // o corpo, afinando numa ponta no alto
+      x.fillStyle = cor[1];
+      x.beginPath();
+      x.moveTo(0, -a * 0.92);
+      x.quadraticCurveTo(l, -a * 0.30, l * 0.86, a * 0.26);
+      x.quadraticCurveTo(0, a * 0.62, -l * 0.86, a * 0.26);
+      x.quadraticCurveTo(-l, -a * 0.30, 0, -a * 0.92);
+      x.fill();
+
+      // um claro de um lado so, pra nao ficar chapado
+      x.fillStyle = cor[2];
+      x.globalAlpha = 0.45;
+      x.beginPath();
+      x.moveTo(0, -a * 0.86);
+      x.quadraticCurveTo(l * 0.62, -a * 0.28, l * 0.48, a * 0.18);
+      x.quadraticCurveTo(0, a * 0.30, 0, -a * 0.86);
+      x.fill();
+      x.globalAlpha = 1;
+
+      // o calice: tres folhas subindo pelos lados
+      x.fillStyle = '#3f6b48';
+      for (var i = -1; i <= 1; i++) {
+        x.save();
+        x.rotate(i * 0.42);
+        x.beginPath();
+        x.moveTo(0, a * 0.56);
+        x.quadraticCurveTo(l * 0.92, a * 0.10, 0, -a * 0.42);
+        x.quadraticCurveTo(-l * 0.92, a * 0.10, 0, a * 0.56);
+        x.fill();
+        x.restore();
+      }
+      x.restore();
+    }
+
+    var TEM_FILTRO = (function () {
+      var c = novaTela(2, 2).getContext('2d');
+      return typeof c.filter === 'string';
+    })();
+
+    /* Cada combinacao (tipo, cor, desfoque) vira um sprite so. O desfoque e
+       aplicado AQUI, no desenho unico -- se fosse por quadro, cada flor
+       custaria um borrao inteiro trinta vezes por segundo. */
+    function fazerSprite(tipo, cor, desfoque) {
+      var raio = 34;
+      var folga = raio + desfoque * 3 + 6;
+      var c = novaTela(folga * 2, folga * 2);
+      var x = c.getContext('2d');
+      x.translate(folga, folga);
+      if (desfoque && TEM_FILTRO) x.filter = 'blur(' + desfoque + 'px)';
+      if (tipo === 1) desenharGirassol(x, raio);
+      else if (tipo === 2) desenharBotao(x, raio, cor);
+      else if (tipo === 3) desenharTulipa(x, raio, cor);
+      else desenharRosa(x, raio, cor);
+      return { tela: c, meio: folga };
+    }
+
+    var sprites = {};
+    function spriteDe(tipo, iCor, desfoque) {
+      var ch = tipo + '|' + iCor + '|' + desfoque;
+      if (!sprites[ch]) sprites[ch] = fazerSprite(tipo, PALETA[iCor], desfoque);
+      return sprites[ch];
+    }
+
+    /* ---------------- o canteiro ---------------- */
+    /* Quatro planos. O de tras sobe alto e ralo, o do meio e o nitido, o
+       terceiro e a faixa cheia rente ao rodape -- e ela que faz o canteiro
+       parecer canteiro, e nao um punhado de hastes soltas -- e o da frente
+       sao poucas flores grandes e bem borradas, encostadas na camera. */
+    var PLANOS = [
+      { n: 32, esc: 0.40, desf: 5, alfa: 0.50, alt: [0.30, 0.66], bal: 0.5 },
+      { n: 38, esc: 0.76, desf: 0, alfa: 1.00, alt: [0.15, 0.46], bal: 0.8 },
+      { n: 28, esc: 1.00, desf: 2, alfa: 0.95, alt: [0.04, 0.19], bal: 0.9 },
+      { n: 12, esc: 1.65, desf: 9, alfa: 0.78, alt: [0.00, 0.11], bal: 1.2 }
+    ];
+
+    var plantas = [], W = 0, H = 0, dpr = 1;
+    var ctx = cv.getContext('2d');
+
+    function semear() {
+      plantas = [];
+      for (var p = 0; p < PLANOS.length; p++) {
+        var d = PLANOS[p];
+        for (var i = 0; i < d.n; i++) {
+          /* 0 rosa (a maioria), 1 girassol, 2 botao fechado, 3 tulipa */
+          var r = Math.random();
+          var tipo = r < 0.28 ? 3 : r < 0.40 ? 1 : r < 0.52 ? 2 : 0;
+          plantas.push({
+            plano: p,
+            x: Math.random(),
+            /* altura contada a partir do rodape: o de tras sobe mais que o
+               da frente, que e o que faz o canteiro parecer fundo */
+            sobe: d.alt[0] + Math.random() * (d.alt[1] - d.alt[0]),
+            esc: d.esc * (0.72 + Math.random() * 0.56),
+            tipo: tipo,
+            cor: Math.floor(Math.random() * PALETA.length),
+            atraso: Math.random() * 2.6,
+            fase: Math.random() * Math.PI * 2,
+            vel: 0.5 + Math.random() * 0.5,
+            curva: (Math.random() - 0.5) * 0.14
+          });
+        }
+      }
+      // as de tras primeiro: quem esta na frente cobre quem esta atras
+      plantas.sort(function (a, b) { return a.plano - b.plano; });
+    }
+
+    function medir() {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    function suave(v) { return v < 0 ? 0 : v > 1 ? 1 : v * v * (3 - 2 * v); }
+
+    var t0 = 0, raf = 0, rodando = true;
+
+    function quadro(ms) {
+      if (!rodando) return;
+      if (!t0) t0 = ms;
+      var t = (ms - t0) / 1000;
+
+      ctx.clearRect(0, 0, W, H);
+      // um claro quente no meio, como se houvesse luz alem do jardim
+      var g = ctx.createRadialGradient(W * 0.5, H * 0.42, 0,
+                                       W * 0.5, H * 0.42, Math.max(W, H) * 0.62);
+      g.addColorStop(0, 'rgba(60,44,58,0.55)');
+      g.addColorStop(1, 'rgba(11,11,15,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      for (var i = 0; i < plantas.length; i++) {
+        var f = plantas[i], d = PLANOS[f.plano];
+        var tt = t - f.atraso;
+        if (tt <= 0) continue;
+
+        var cresce = suave(tt / 1.1);            // a haste subindo
+        var abre   = suave((tt - 0.85) / 1.2);   // a flor abrindo
+        if (cresce <= 0) continue;
+
+        var bx = f.x * W;
+        var by = H + 6;
+        var altura = f.sobe * H * cresce;
+        var bal = Math.sin(t * f.vel + f.fase) * 13 * d.bal * cresce;
+        var px = bx + bal + f.curva * altura;
+        var py = by - altura;
+
+        // a haste: uma curva so, da base ate a flor
+        ctx.strokeStyle = f.plano === 0 ? 'rgba(38,66,44,.70)'
+                        : f.plano === 1 ? 'rgba(52,92,58,.95)'
+                        : f.plano === 2 ? 'rgba(44,80,50,.92)' : 'rgba(26,48,32,.80)';
+        ctx.lineWidth = Math.max(1, 2.6 * d.esc);
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.quadraticCurveTo(bx + bal * 0.35, by - altura * 0.55, px, py);
+        ctx.stroke();
+
+        if (abre <= 0) continue;
+        var sp = spriteDe(f.tipo, f.cor, d.desf);
+        var esc = f.esc * abre * 0.92;
+        ctx.globalAlpha = d.alfa * abre;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(bal * 0.004);
+        ctx.drawImage(sp.tela, -sp.meio * esc, -sp.meio * esc,
+                      sp.tela.width * esc, sp.tela.height * esc);
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+
+      raf = requestAnimationFrame(quadro);
+    }
+
+    medir();
+    semear();
+    raf = requestAnimationFrame(quadro);
+    window.addEventListener('resize', function () { medir(); });
+
+    /* ---------------- a senha ---------------- */
+    function errar(msg) {
+      if (erro) { erro.textContent = msg; erro.classList.add('is-on'); }
+      forma.classList.remove('is-errado');
+      void forma.offsetWidth;                 // reinicia a animacao do tranco
+      forma.classList.add('is-errado');
+      campo.value = '';
+      campo.focus();
+    }
+
+    function abrir() {
+      caixa.classList.add('is-aberto');
+      document.body.classList.remove('tem-portao');
+      /* o jardim para quando some: sem isto ele seguiria desenhando por tras
+         da casa inteira, gastando bateria a toa */
+      setTimeout(function () {
+        rodando = false;
+        if (raf) cancelAnimationFrame(raf);
+        caixa.setAttribute('hidden', '');
+      }, 1000);
+    }
+
+    forma.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = (campo.value || '').trim().toLowerCase();
+      if (!v) { errar('escreva a senha'); return; }
+      if (v === SENHA) {
+        if (erro) { erro.textContent = ''; erro.classList.remove('is-on'); }
+        abrir();
+      } else {
+        errar('não é essa');
+      }
+    });
+
+    campo.addEventListener('input', function () {
+      if (erro && erro.classList.contains('is-on')) erro.classList.remove('is-on');
+    });
+
+    setTimeout(function () { campo.focus(); }, 450);
+  })();
+
   /* ---------------------------------------------------------
      TEXTOS — tudo editável aqui
      --------------------------------------------------------- */
