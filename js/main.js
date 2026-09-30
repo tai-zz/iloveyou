@@ -1252,19 +1252,41 @@
       velEl    = document.getElementById('speed-readout');
       marchaEl = document.getElementById('gear-readout');
 
-      /* Busca os dois arquivos. Se um faltar ou o navegador nao souber
-         decodificar (opus, por exemplo), o outro ainda monta as ancoras que
-         sao dele -- o motor perde faixa mas continua tocando. So se nenhum
-         vier e que entra o sintetizado, pra o jogo nunca ficar mudo. */
-      function baixar(url) {
-        return fetch(url)
-          .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
-          .then(function (b) {
-            return new Promise(function (ok, erro) { ac.decodeAudioData(b, ok, erro); });
-          })
-          .catch(function () { return null; });
+      /* Busca os dois arquivos. Se um faltar, ou o navegador nao souber
+         decodificar, o outro ainda monta as ancoras que sao dele -- o motor
+         perde faixa mas continua tocando. So se nenhum vier e que entra o
+         sintetizado, pra o jogo nunca ficar mudo.
+
+         DUAS TRAVAS, e as duas existem por causa do telefone.
+
+         O Safari nao le webm. Pior que nao ler: pedir pra ele decodificar um
+         nao devolve erro em toda versao -- em algumas o decodeAudioData nao
+         chama NENHUM dos dois callbacks e fica por isso mesmo. Aqui dentro de
+         um Promise.all, uma promessa que nunca resolve nao deixa so a fatia
+         faltando: ela segura o montarGravado pra sempre, e o motor fica mudo
+         sem nem cair no sintetizado.
+
+         Por isso: pergunta antes se o navegador toca o formato, e poe prazo em
+         cada decodificacao. Quem nao responder a tempo vira null e o resto
+         segue. Perguntar antes tambem poupa 874 KB de download no iPhone, que
+         ele nao usaria pra nada. */
+      var leWebm = !!document.createElement('audio')
+        .canPlayType('audio/webm; codecs="opus"');
+
+      function baixar(url, vale) {
+        if (!vale) return Promise.resolve(null);
+        return new Promise(function (pronto) {
+          var fechado = false;
+          function fim(v) { if (!fechado) { fechado = true; pronto(v || null); } }
+          setTimeout(function () { fim(null); }, 8000);
+          fetch(url)
+            .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+            .then(function (b) { ac.decodeAudioData(b, fim, function () { fim(null); }); })
+            .catch(function () { fim(null); });
+        });
       }
-      Promise.all([baixar('media/motor.mp3'), baixar('media/motor.webm')])
+
+      Promise.all([baixar('media/motor.mp3', true), baixar('media/motor.webm', leWebm)])
         .then(function (bufs) {
           if (!montarGravado({ velho: bufs[0], novo: bufs[1] })) montarSintetizado();
         })
