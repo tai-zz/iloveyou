@@ -203,8 +203,16 @@
 
   /* 2.3 — neve caindo, vista pela janela do quarto */
   /* 2.4 — neve dentro do filme que passa na TV da sala */
+  /* Cada floco e um circulo que se mexe sozinho, e mexer um pedacinho
+     obriga a repintar a fatia do desenho em volta. No computador 30 flocos
+     por janela nao pesam; no celular em pe o comodo e um panorama de
+     1444px, e a conta de repintura fica alta. No dedo a janela nevada
+     aparece do tamanho de uma unha: 12 flocos leem igual a 30. */
+  var NO_DEDO = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+
   function semearNeve(host, x0, largura, alturaY, qtd, raioMax) {
     if (!host) return;
+    if (NO_DEDO) qtd = Math.ceil(qtd * 0.4);
     for (var i = 0; i < qtd; i++) {
       var f = document.createElementNS(SVGNS, 'circle');
       f.setAttribute('cx', (x0 + Math.random() * largura).toFixed(1));
@@ -1400,12 +1408,29 @@
     }).catch(function () {});
   }
 
+  /* O episodio tem 66 MB. Antes o src era ligado na abertura da pagina, e
+     medindo no celular em pe deu no que se esperava: o arquivo INTEIRO
+     descia -- 255 s de video guardados na memoria -- com a pessoa ainda no
+     quarto, sem nunca ter aberto a sala dos titas. O servidor de teste nao
+     responde a pedido por pedaco, entao o navegador nao tem como pegar so o
+     comeco: ou nada, ou tudo.
+
+     Agora o arquivo so e ligado quando a imersao abre de verdade. A checagem
+     de existencia continua na abertura, mas por HEAD, que traz cabecalho e
+     nenhum byte de video -- e o que decide se toca o episodio ou cai no
+     ronco sintetizado. */
+  var aotExiste = null;               // null = ainda nao sei; nao descarta
   if (videoAot && videoAot.dataset.src) {
     fetch(videoAot.dataset.src, { method: 'HEAD' }).then(function (r) {
-      if (!r.ok) return;
-      videoAot.addEventListener('loadeddata', function () { videoAot.classList.add('is-on'); });
-      videoAot.src = videoAot.dataset.src;
-    }).catch(function () {});
+      aotExiste = r.ok;
+    }).catch(function () { aotExiste = false; });
+  }
+
+  function ligarFonteAot() {
+    if (!videoAot || videoAot.getAttribute('src')) return false;
+    videoAot.addEventListener('loadeddata', function () { videoAot.classList.add('is-on'); });
+    videoAot.src = videoAot.dataset.src;
+    return true;
   }
 
   /* =========================================================
@@ -1632,6 +1657,23 @@
     'media/album/album-05.webp', 'media/album/album-06.webp'
   ];
 
+  /* As fotos de nos dois, no album ao lado do retrato da familia, na sala */
+  var NOS = (function () {
+    var p = [];
+    for (var i = 1; i <= 14; i++) p.push('media/nos/nos-' + (i < 10 ? '0' + i : i) + '.webp');
+    return p;
+  })();
+
+  /* O livro do atril, no my room: as 33 paginas do PDF viradas imagem.
+     Imagem porque assim ele abre no mesmo visor do resto da casa -- sem
+     leitor de PDF, que em celular abre fora do site ou nem abre, e sem puxar
+     o arquivo inteiro de uma vez: cada pagina chega quando for virada. */
+  var LIVRO = (function () {
+    var p = [];
+    for (var i = 1; i <= 33; i++) p.push('media/livro/pagina-' + (i < 10 ? '0' + i : i) + '.webp');
+    return p;
+  })();
+
   /* Os sete que sairam da estante e viraram quadro na parede do my room.
      Aqui eles usam a mesma lupa da pasta de desenhos, mas sem passar pela
      grade: clicou, abriu o primeiro, e as setas passam um por vez. */
@@ -1702,6 +1744,13 @@
 
   function verPosteres() {
     galAtual = POSTERES;
+    abrirLupa(0);
+  }
+
+  /* o livro abre direto na capa e se vira pelas setas, como um livro mesmo --
+     sem passar pela grade de miniaturas, que nao faz sentido pra paginas */
+  function verLivro() {
+    galAtual = LIVRO;
     abrirLupa(0);
   }
   function passarLupa(d) { abrirLupa(atualDes + d); }
@@ -1787,6 +1836,13 @@
         abrirGaleria(ALBUM, 'o álbum em cima da mesa', 'vocês duas');
         return;
       }
+      // o outro album, na sala, ao lado do retrato da familia
+      if (chave === 'nosalbum') {
+        abrirGaleria(NOS, 'o álbum ao lado do retrato', 'nós dois');
+        return;
+      }
+      // o livro no atril do my room: abre na capa e vira pagina por pagina
+      if (chave === 'livro')    { verLivro(); return; }
       // e a estante abre o visor, que é onde a colecão aparece de perto
       if (chave === 'estante')  { abrirVitrine(); return; }
       // a parede do my room: um pôster por vez, com seta pra passar
@@ -2777,9 +2833,23 @@
       if (v.paused) v.play().catch(function () {});
     }
   }
+  /* Arrastar o panorama dispara scroll dezenas de vezes por segundo, e cada
+     chamada aqui LE a caixa de cada marca e depois ESCREVE a posicao do video.
+     Ler depois de escrever forca o navegador a recalcular o layout na hora,
+     no meio do arrasto -- e o que faz o panorama engasgar no celular em pe.
+
+     Uma medida por quadro basta: o video nao precisa saber de posicoes que
+     nunca chegaram a aparecer na tela. */
+  var vigiaMarcado = false;
+  function pedirVigia() {
+    if (vigiaMarcado) return;
+    vigiaMarcado = true;
+    requestAnimationFrame(function () { vigiaMarcado = false; vigiarVideos(); });
+  }
+
   // captura: o panorama rola dentro do .scene__stage, nao na janela
-  document.addEventListener('scroll', vigiarVideos, true);
-  window.addEventListener('resize', vigiarVideos);
+  document.addEventListener('scroll', pedirVigia, true);
+  window.addEventListener('resize', pedirVigia);
   setInterval(vigiarVideos, 400);
 
   function aoEntrarNoComodo(comTransicao) {
@@ -3884,9 +3954,12 @@
       else       { Moto.desligar(); Jogo.parar(); }
     }
     if (chave === 'titans') {
-      if (videoAot && videoAot.getAttribute('src')) {
-        if (ligar) tocarVideo(!pausadoPelaAba);   // voltar da aba retoma de onde parou
-        else { videoAot.pause(); somBtn.hidden = true; }
+      if (videoAot && videoAot.dataset.src && aotExiste !== false) {
+        if (ligar) {
+          // primeira entrada: e aqui que os 66 MB comecam a vir, nao antes
+          var estreia = ligarFonteAot();
+          tocarVideo(estreia || !pausadoPelaAba);   // voltar da aba retoma de onde parou
+        } else { videoAot.pause(); somBtn.hidden = true; }
       } else {
         ligar ? Ronco.ligar() : Ronco.desligar();
       }

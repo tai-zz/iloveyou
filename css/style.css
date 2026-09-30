@@ -1983,3 +1983,138 @@ body.dicas-abertas .hint{ opacity:0; }
   /* a legenda da imersao sai do caminho do polegar esquerdo */
   body.is-imersao .imersao-caption{ display:none; }
 }
+
+/* ---- o controle de volume no dedo ----
+   A barra nasce com 3px de altura, pensada pro ponteiro do mouse. No dedo
+   isso e quase impossivel de pegar: erra e o toque cai no cenario atras.
+   Aqui ela ganha area de sobra, sem mudar o desenho -- a pista continua fina,
+   o que cresce e a regiao que responde ao toque, mais o botao que se arrasta. */
+@media (pointer:coarse){
+  .vol__range{
+    height:30px;
+    padding:0;
+    background:transparent;
+  }
+  .vol__range::-webkit-slider-runnable-track{
+    height:5px; border-radius:3px;
+    background:rgba(255,255,255,.16);
+  }
+  .vol__range::-moz-range-track{
+    height:5px; border-radius:3px;
+    background:rgba(255,255,255,.16);
+  }
+  .vol__range::-webkit-slider-thumb{
+    width:22px; height:22px; margin-top:-8.5px;
+  }
+  .vol__range::-moz-range-thumb{
+    width:22px; height:22px;
+  }
+  /* o tocador da sala tambem fica maior no dedo */
+  .player__toggle{ min-width:44px; min-height:44px; }
+}
+
+/* =========================================================
+   PESO NO CELULAR EM PE
+   Medido na janela de 375x812, dentro do quarto:
+
+     303 animacoes rodando ao mesmo tempo -- e so 95 estavam
+         na cena que aparecia. As outras 208 corriam em 11 cenas
+         escondidas, porque .scene usa visibility:hidden, e
+         visibility NAO para animacao: o navegador continua
+         calculando estilo pra tudo, todo quadro, sem pintar nada.
+
+      47 elementos, no quarto, com drop-shadow E animacao ao
+         mesmo tempo (as lampadas do pisca-pisca e do espelho).
+         Cada um desses obriga o navegador a desenhar a peca,
+         desfocar e compor DE NOVO a cada quadro. Era o item
+         mais caro da pagina.
+
+    10,5 Mpx de panorama pintado num aparelho de dpr 3, pra uma
+         tela que mostra 2,7 Mpx. Em pe o comodo e um panorama de
+         1444px numa janela de 375: tres quartos de cada repintura
+         vao pra fora da tela.
+   ========================================================= */
+
+/* 1. cena que nao esta no ar nao anima.
+   A troca de cena continua igual: visibility/opacity seguem como
+   antes, e as animacoes voltam a andar sozinhas quando a cena
+   recebe .is-active. */
+.scene:not(.is-active) *{ animation-play-state:paused; }
+
+/* 2. no dedo, o brilho fica -- o pisca sai.
+   O drop-shadow de cada lampada e barato quando nao muda: o
+   navegador desenha o desfoque uma vez e guarda. O que custava era
+   piscar, que jogava esse desfoque no lixo 47 vezes por quadro.
+   Trocando o pisca por luz acesa, o quarto continua com as
+   lampadas brilhando e o trabalho por quadro vai a zero. */
+@media (pointer:coarse){
+  .bulbs circle,
+  .fairy__bulbs circle,
+  .bath-bulbs circle,
+  .heater__bars line{ animation:none; opacity:1; }
+}
+
+
+/* ---- virar pagina no dedo: livro, posteres e desenhos ----
+   As setas do visor eram irmas da imagem numa linha so, com 42px. Numa tela
+   estreita a imagem toma 93% da largura, entao elas acabavam por cima da
+   propria pagina -- pequenas, meio cortadas nas bordas e em cima do texto.
+   Dava pra nao perceber que existiam, e sem elas nao ha como passar de um
+   poster pro outro: o visor dos posteres nao tem grade pra voltar.
+
+   Aqui elas viram faixa lateral, a mesma ideia das setas do minigame: uma
+   area larga, de cima a baixo, que o polegar acerta sem mirar. A faixa para
+   antes do topo e antes do rodape pra nao engolir o X de fechar nem o
+   contador de paginas. O zoom continua sendo o do navegador -- dois dedos
+   na pagina -- e nao briga com isto, que responde a um toque so. */
+@media (pointer:coarse){
+  .lupa{ padding:10px 8px 58px; gap:0; }
+
+  .lupa__seta{
+    position:fixed; top:13%; bottom:13%;
+    width:24vw; max-width:132px;
+    height:auto; border-radius:0;
+    border:none; background:transparent;
+    display:flex; align-items:center; justify-content:center;
+    font-size:2.2rem; color:rgba(255,255,255,.42);
+    -webkit-tap-highlight-color:transparent;
+    z-index:3;
+    transition:color .18s var(--ease), background .18s var(--ease);
+  }
+  .lupa__seta--esq{
+    left:0;
+    background:linear-gradient(to right, rgba(0,0,0,.34), transparent);
+  }
+  .lupa__seta--dir{
+    right:0;
+    background:linear-gradient(to left, rgba(0,0,0,.34), transparent);
+  }
+
+  /* No dedo nao existe "passar o mouse por cima". A regra de hover la de
+     cima usa o atalho `background`, que zera o background-image junto: o
+     gradiente sumia e no lugar dele ficava um retangulo claro. E pior, em
+     celular o hover gruda -- fica aceso depois do toque, ate se tocar em
+     outro canto. Aqui a faixa e devolvida ao que era. */
+  .lupa__seta:hover{ background:transparent; }
+  .lupa__seta--esq:hover{
+    background:linear-gradient(to right, rgba(0,0,0,.34), transparent);
+  }
+  .lupa__seta--dir:hover{
+    background:linear-gradient(to left, rgba(0,0,0,.34), transparent);
+  }
+
+  .lupa__seta:active{ color:rgba(255,235,190,.98); }
+  .lupa__seta--esq:active{
+    background:linear-gradient(to right, rgba(255,220,160,.22), transparent);
+  }
+  .lupa__seta--dir:active{
+    background:linear-gradient(to left, rgba(255,220,160,.22), transparent);
+  }
+
+  /* a pagina fica com a largura inteira: as setas nao ocupam mais lugar na
+     linha, agora elas flutuam por cima das margens do papel */
+  .lupa__img{ max-height:100%; }
+
+  /* o X de fechar precisa ganhar do gradiente da faixa direita */
+  .lupa__fechar{ z-index:4; }
+}
