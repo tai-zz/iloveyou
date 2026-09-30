@@ -1075,6 +1075,18 @@
     // topo de cada marcha sao as de fabrica, em km/h.
     var MIN = 1250, MAX = 14500;
     var TOPO = [110, 145, 180, 215, 255, 299];
+    /* Os dois pontos da caixa, em fracao do corte: onde ela sobe e onde ela
+       desce. A folga entre eles e o que impede a marcha de ficar trocando pra
+       frente e pra tras -- depois de subir, o giro cai pra 74-83% do corte,
+       bem longe do ponto de descida.
+
+       0,68 embaixo veio do video de referencia, nao do gosto: la a faixa de
+       giro dentro de cada marcha e de 1,12 a 1,5 vez, e com o ponto de subida
+       em 0,97 e 0,68 que da essa mesma largura. O banco cobre bem mais que
+       isso (6.240 a 14.400 rpm), entao aqui quem manda e a moto, nao o
+       arquivo. Abaixo de 0,68 so em primeira, na largada, onde a caixa nao
+       tem pra onde descer. */
+    var SOBE = 0.97, DESCE = 0.68;
     var kmh = 0;
     var manual = false, alvoRpm = 1100, volMax = 0.3;
 
@@ -1083,61 +1095,76 @@
 
     /* ---------------- o motor gravado ----------------
 
-       O audio NAO e alterado. Nada de mudar o tom, nada de filtro: cada
-       pedaco toca exatamente como foi gravado, na velocidade original.
+       A gravacao e o audio de uma subida de 0 a 300 de uma S1000RR. Ela serve
+       melhor que a anterior por um motivo so: varre a faixa de giro inteira,
+       marcha por marcha, entao da pra tirar recorte de qualquer altura.
 
-       O que existe e uma escolha. Medi por espectro onde cada altura acontece
-       na gravacao -- ela varre de 205 a 480 Hz, que num quatro cilindros
-       quatro tempos da de 6.000 a 14.400 rpm. Dai saem vinte e um recortes, um
-       em cada altura. A cada instante toca o recorte cuja altura mais se
-       aproxima do giro do momento, e a troca entre um e outro e cruzada em
-       60 ms pra nao estalar.
+       COMO AS ALTURAS FORAM MEDIDAS. O espectro de um quatro cilindros e um
+       pente: no arquivo, os picos saem em 384, 577, 674, 771, 867, 961 Hz...
+       espacados sempre pelo mesmo intervalo. Esse espacamento e a meia-ordem
+       do motor -- rpm/120 -- e e ele que da a altura sem ambiguidade nenhuma,
+       coisa que autocorrelacao sozinha nao da (ela cai em subharmonico). O
+       maximo medido e 122 Hz de espacamento, que da 14.600 rpm: o corte da
+       moto, como tem que ser numa subida ate o fim de cada marcha.
+       Os hz da tabela abaixo estao na conta que o resto do codigo usa --
+       rpm/30, ou seja quatro vezes o espacamento.
 
-       Como os degraus entre recortes vizinhos sao de 2 a 10%, a subida de giro
-       soa continua sem que nenhuma amostra precise ser esticada. */
-    var FATIA = 0.34, CRUZADA = 0.012;
-    /* No fim da sexta a moto fica cravada no giro, e uma fatia de 0,34 s se
-       repetindo tres vezes por segundo entrega o truque na hora. Nas duas
-       fatias do topo a gravacao segura a altura por quase um segundo, entao
-       la elas podem ser bem mais longas e a repeticao some. */
-    var FATIA_TOPO = 0.86;
+       AGORA O AUDIO E ALTERADO, E DE PROPOSITO. Antes a regra era tocar cada
+       pedaco na velocidade original, sem nunca mexer no tom. Isso funcionava
+       enquanto o motor so vivia no topo do conta-giros, onde as ancoras eram
+       vizinhas de 8 a 43 cents -- degraus que nao se ouvem como nota. Quando o
+       motor passou a varrer a faixa inteira, a escolha por proximidade passou
+       a pular degraus de 90 a 186 cents: semitons e tons inteiros. Uma nota
+       segurada pulando um semitom e voltando e, literalmente, uma buzina de
+       dois tons -- e era isso que se ouvia.
+
+       Entao a fatia escolhida agora e esticada pelo resto: playbackRate leva
+       a altura dela exatamente no giro pedido. Com as ancoras abaixo o maior
+       vao e de 141 cents, entao a correcao nunca passa de 70 cents -- 4% de
+       velocidade, que nao se ouve como andar rapido nem devagar. O que se
+       ouve e uma altura continua, sem degrau nenhum.
+
+       Medido: numa varredura lenta de giro, o maior salto de altura entre um
+       quadro e o seguinte caiu de 73 cents (quase um semitom, que e o que se
+       ouve como nota) pra 32 (menos de um quarto de tom, que se ouve como
+       glissando). E o perfil do desvio, que sem a correcao era uma serra --
+       rampa de +48 a -24 cents e pulo de volta --, ficou sem forma nenhuma. */
+    var FATIA = 0.26, CRUZADA = 0.012;
+    /* Quanto a fatia pode ser esticada, pra cima e pra baixo. Existe so como
+       trava: se um dia o giro sair da faixa que a gravacao cobre, e melhor a
+       altura errar do que a moto virar um zangao. */
+    var ESTICA_MAX = 1.14;
+    /* DUAS GRAVACOES, e nao e capricho.
+
+       Medi a forca do pente em cada instante dos dois arquivos: o quanto os
+       harmonicos de um mesmo espacamento se destacam do resto do espectro.
+       Onde essa forca e baixa, o que existe ali e vento e ruido de estrada, e
+       qualquer altura que se meca e chute. A conta deu isto:
+
+                            grave (208-250)   meio (265-375)   agudo (375-500)
+         motor.mp3   (0-300 antigo)    ~0             23            149
+         motor.webm  (0-300 novo)      60              7             27
+
+       Um cobre o que o outro nao tem. Usar so o novo deixaria um buraco no
+       meio da faixa -- justo onde o motor passa a maior parte do tempo -- e
+       usar so o velho deixaria a largada sem grave nenhum. Entao cada ancora
+       vem de onde o pente e mais forte, e o campo `de` diz de qual arquivo.
+
+       Os hz sao a meia-ordem medida vezes quatro, pra ficar na conta rpm/30
+       que o resto do codigo usa. Todas as dezesseis tem forca de pente acima
+       de 4,1 -- nenhuma e chute. */
     var BANCO = [
-      { t: 22.40, hz: 205 }, { t: 22.60, hz: 210 }, { t: 22.80, hz: 220 },
-      { t: 23.00, hz: 245 }, { t: 23.40, hz: 270 }, { t: 24.00, hz: 285 },
-      { t: 24.20, hz: 290 }, { t: 24.40, hz: 310 }, { t: 24.60, hz: 335 },
-      { t: 24.80, hz: 355 }, { t: 25.00, hz: 375 }, { t: 25.20, hz: 395 },
-      { t: 28.40, hz: 405 }, { t: 28.60, hz: 415 }, { t: 28.80, hz: 425 },
-      { t: 29.00, hz: 430 }, { t: 29.40, hz: 440 }, { t: 29.80, hz: 450 },
-      /* AS DUAS DO TOPO. No limitador o giro nao anda, entao escolher "a mais
-         proxima" devolveria sempre a mesma fatia e o motor soaria travado --
-         por isso ali a escolha passa a alternar, pra variar a TEXTURA.
-
-         Elas tem que ter a MESMA ALTURA, e e onde estava a buzina. Antes o
-         rodizio era entre 29,40 s, 5,85 s e 9,02 s. Medindo a altura real de
-         cada uma por casamento de pente harmonico no proprio arquivo:
-
-             29,40 s -> 445 Hz     5,85 s -> 450,5 Hz     9,02 s -> 472,5 Hz
-
-         A de 9,02 s esta 104 cents acima da primeira e 83 acima da segunda --
-         um semitom cheio. E o rodizio troca a cada 1,15 s, sem parar. O que se
-         ouvia era uma nota segurada dando um pulo de semitom e voltando, tres
-         vezes a cada tres segundos e meio: e exatamente assim que soa uma
-         buzina de dois tons. Nao era o motor, era o intervalo.
-
-         Ficaram as duas que estao a 23 cents uma da outra -- diferenca que nao
-         se ouve como nota. Vem de pontos bem separados da gravacao (30,0 s e
-         5,85 s), sem sobreposicao nenhuma, e com duracoes diferentes (0,33 e
-         0,61 s), entao a alternancia nao cai num compasso perceptivel.
-
-         A de 9,02 s saiu do banco de vez: como era a mais aguda de todas, a
-         escolha por proximidade tambem a pegava chegando no fim do velocimetro,
-         e era dali que vinha a buzina antes mesmo do limitador. Sem ela o motor
-         encosta o teto em 455 Hz em vez de 472 -- 6% mais grave no talo, que e
-         um preco pequeno perto de um semitom pulando sem parar. */
-      { t: 30.00, hz: 455, topo: true },
-      { t: 5.85, hz: 452, dur: 0.72, topo: true }
+      { de: 'novo',  t: 15.30, hz: 208 }, { de: 'novo',  t: 17.10, hz: 222 },
+      { de: 'novo',  t: 14.70, hz: 235 }, { de: 'novo',  t: 13.90, hz: 250 },
+      { de: 'novo',  t: 16.40, hz: 271 }, { de: 'velho', t: 23.90, hz: 281 },
+      { de: 'novo',  t: 14.30, hz: 299 }, { de: 'novo',  t: 10.40, hz: 316 },
+      { de: 'velho', t: 26.50, hz: 339 }, { de: 'velho', t: 19.00, hz: 350 },
+      { de: 'velho', t: 14.80, hz: 365 }, { de: 'novo',  t: 15.00, hz: 384 },
+      { de: 'velho', t: 31.20, hz: 406 }, { de: 'velho', t: 5.50,  hz: 428 },
+      { de: 'velho', t: 29.50, hz: 444 }, { de: 'velho', t: 9.70,  hz: 480 }
     ];
-    var banco = null, ganhoMotor = null, tocando = -1, altas = [];
+    var banco = null, ganhoMotor = null, tocando = -1;
+    var ultimaEscolha = -1, quadrosParado = 0;
 
     /* Recorta um pedaco e costura as pontas: o fim entra por cima do comeco
        com o peso subindo, pra o loop nao estalar na volta.
@@ -1187,25 +1214,26 @@
       return saida;
     }
 
-    function montarGravado(buf) {
+    function montarGravado(arqs) {
       ganhoMotor = ac.createGain();
       ganhoMotor.gain.value = 0.95;
       ganhoMotor.connect(comp);
       banco = [];
       for (var i = 0; i < BANCO.length; i++) {
-        var b = recortarLoop(buf, BANCO[i].t, BANCO[i].dur || FATIA, CRUZADA);
+        var fonteBuf = arqs[BANCO[i].de];
+        if (!fonteBuf) continue;          // arquivo faltando: pula so estas ancoras
+        var b = recortarLoop(fonteBuf, BANCO[i].t, BANCO[i].dur || FATIA, CRUZADA);
         if (!b) continue;
         var g = ac.createGain(); g.gain.value = 0.0001;
         var f = ac.createBufferSource();
         f.buffer = b; f.loop = true; f.loopStart = 0; f.loopEnd = b.duration;
-        // playbackRate fica em 1: o pedaco toca na velocidade em que foi gravado
+        /* playbackRate comeca em 1 e passa a ser dirigido em passo(): e ele
+           que tira o degrau entre uma ancora e a vizinha. */
         f.connect(g); g.connect(ganhoMotor);
         f.start();
-        banco.push({ hz: BANCO[i].hz, topo: !!BANCO[i].topo, fonte: f, ganho: g });
+        banco.push({ hz: BANCO[i].hz, fonte: f, ganho: g });
       }
       if (banco.length < 2) { banco = null; return false; }
-      altas = [];
-      for (var q = 0; q < banco.length; q++) if (banco[q].topo) altas.push(q);
       // o compressor de antes achatava a gravacao; aqui ele so segura os picos
       comp.threshold.value = -12; comp.ratio.value = 2.5;
       return true;
@@ -1224,14 +1252,22 @@
       velEl    = document.getElementById('speed-readout');
       marchaEl = document.getElementById('gear-readout');
 
-      /* Tenta a gravacao; se ela nao vier, o motor sintetizado de antes
-         assume, e o jogo continua com som em vez de ficar mudo. */
-      fetch('media/motor.mp3')
-        .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
-        .then(function (b) {
-          return new Promise(function (ok, erro) { ac.decodeAudioData(b, ok, erro); });
+      /* Busca os dois arquivos. Se um faltar ou o navegador nao souber
+         decodificar (opus, por exemplo), o outro ainda monta as ancoras que
+         sao dele -- o motor perde faixa mas continua tocando. So se nenhum
+         vier e que entra o sintetizado, pra o jogo nunca ficar mudo. */
+      function baixar(url) {
+        return fetch(url)
+          .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+          .then(function (b) {
+            return new Promise(function (ok, erro) { ac.decodeAudioData(b, ok, erro); });
+          })
+          .catch(function () { return null; });
+      }
+      Promise.all([baixar('media/motor.mp3'), baixar('media/motor.webm')])
+        .then(function (bufs) {
+          if (!montarGravado({ velho: bufs[0], novo: bufs[1] })) montarSintetizado();
         })
-        .then(function (buf) { if (!montarGravado(buf)) montarSintetizado(); })
         .catch(function () { montarSintetizado(); });
     }
 
@@ -1306,32 +1342,71 @@
            volta, entao a frequencia que se ouve e rpm/30. E por essa conta que
            se acha o recorte certo.
 
-           Nenhum ajuste no som: so se escolhe QUAL pedaco toca. Se o giro cair
-           abaixo do que a gravacao tem, fica o pedaco mais grave dela -- e o
-           som mais baixo que existe no arquivo, e nao vale inventar o resto. */
+           A escolha da a fatia mais perto; quem acerta a altura e o estica
+           logo abaixo. Se o giro sair da faixa da gravacao, a trava do
+           ESTICA_MAX segura -- ali a altura erra em vez de virar zangao. */
         var alvoHz = rpm / 30;
         var i = 0;
         for (var j = 1; j < banco.length; j++) {
           if (Math.abs(banco[j].hz - alvoHz) < Math.abs(banco[i].hz - alvoHz)) i = j;
         }
-        /* Histerese. No alto do giro as ancoras ficam a poucos hertz uma da
-           outra (450, 452, 455), e a menor oscilacao fazia a escolha pular
-           entre elas a cada quadro. So troca quem esta tocando se a nova for
-           claramente melhor -- senao fica onde esta. */
+        /* Histerese: so troca a fatia se a nova for claramente melhor. Sem
+           isso, com o giro parado entre duas ancoras a escolha pulava de uma
+           pra outra a cada quadro. Agora que a altura e corrigida no
+           playbackRate, esse pulo nao mudaria a nota -- mas mudaria a TEXTURA
+           varias vezes por segundo, que e igualmente feio. */
         if (tocando >= 0 && tocando !== i) {
           var dAtual = Math.abs(banco[tocando].hz - alvoHz);
           var dNova = Math.abs(banco[i].hz - alvoHz);
           if (dNova > dAtual * 0.72) i = tocando;
         }
 
-        /* Cravado no fim da ultima marcha o giro nao anda, e escolher "a fatia
-           mais proxima" devolve sempre a mesma -- era isso que ficava em loop.
-           Ali a escolha passa a ser por TEMPO, percorrendo em sequencia as tres
-           fatias altas. Como elas vem de pontos separados da gravacao (29,4 s,
-           5,9 s e 9,0 s), o que se ouve muda de verdade, em vez de repetir. */
-        if (marcha === TOPO.length && kmh > TOPO[TOPO.length - 1] * 0.985 && altas.length > 1) {
-          i = altas[Math.floor(ac.currentTime / 1.15) % altas.length];
+        /* O RODIZIO DE TEXTURA.
+
+           Com a velocidade em rampa, depois de uns 20 s a moto encosta no
+           limitador e o giro para de andar. "A fatia mais proxima" devolve
+           entao sempre a mesma, e o que se ouve e um pedaco de 0,26 s
+           repetindo quatro vezes por segundo -- o truque na cara.
+
+           Ja existiu um rodizio aqui antes, e era de onde vinha a buzina: ele
+           alternava fatias de ALTURAS diferentes, entao o que se ouvia eram
+           duas notas se revezando. Agora e seguro, e pelo mesmo motivo que
+           acabou com o degrau: o estica leva qualquer fatia exatamente na
+           altura pedida, entao trocar de fatia muda a TEXTURA e nao a nota.
+
+           Entram no rodizio so as fatias que o estica alcanca sem estourar o
+           limite -- no topo sao tres (428, 444 e 480 Hz), vindas de pontos
+           bem separados das duas gravacoes.
+
+           O gatilho e o sintoma, nao a causa: conta ha quantos quadros a
+           escolha por proximidade nao muda. Tentei antes medir "o giro parou
+           de andar" por um limiar de variacao, e ele acendia aos 7 s, com a
+           moto ainda em plena subida -- perto do teto a aceleracao ja e tao
+           pequena que qualquer limiar razoavel confunde subir devagar com nao
+           subir. Contar a fatia repetida acerta sozinho: enquanto o giro anda
+           de verdade a escolha troca, e o rodizio nem acorda. */
+        if (i === ultimaEscolha) quadrosParado++;
+        else { quadrosParado = 0; ultimaEscolha = i; }
+        if (quadrosParado > 72) {
+          var perto = [];
+          for (var m = 0; m < banco.length; m++) {
+            var e = alvoHz / banco[m].hz;
+            if (e < ESTICA_MAX && e > 1 / ESTICA_MAX) perto.push(m);
+          }
+          if (perto.length > 1) i = perto[Math.floor(now / 0.9) % perto.length];
         }
+
+        /* AQUI SOME O DEGRAU. A fatia que vai tocar e esticada pra cair
+           exatamente no giro pedido, em vez de tocar na altura em que foi
+           gravada. O maior vao entre ancoras vizinhas e de 103 cents, entao
+           este numero fica entre 0,97 e 1,03 -- 3% de velocidade, que nao se
+           ouve. O que sumiu foi o pulo de semitom entre uma ancora e a
+           seguinte, que era a buzina. */
+        var estica = alvoHz / banco[i].hz;
+        if (estica > ESTICA_MAX) estica = ESTICA_MAX;
+        else if (estica < 1 / ESTICA_MAX) estica = 1 / ESTICA_MAX;
+        banco[i].fonte.playbackRate.setTargetAtTime(estica, now, 0.03);
+
         /* Antes isto so agia quando a fatia mudava, e cancelava as rampas em
            voo pra recomecar outra. Na troca de marcha o giro despenca e cruza
            tres ou quatro fatias em poucos quadros: as rampas eram canceladas
@@ -1378,23 +1453,23 @@
          quem chamou saber quando ela mudou. */
       pilotar: function (v) {
         kmh = Math.max(0, v);
-        var g = 0;
-        while (g < TOPO.length - 1 && kmh > TOPO[g]) g++;
-        marcha = g + 1;
-        var alvo = MAX * (kmh / TOPO[g]);
-        /* Cravado no fim da ultima marcha, o giro ficava parado num valor so e
-           o som virava uma volta de loop sempre igual -- travado. Motor de
-           verdade nao fica quieto ali: ele respira contra o limitador. Essa
-           ondulacao de 2% mantem o giro andando, faz o banco de amostras
-           alternar entre as duas fatias do topo, e ainda da vida ao ponteiro. */
-        if (alvo > MAX * 0.94) {
-          /* No limitador o giro passeia numa faixa larga o bastante pra descer
-             ate a fatia de 452 Hz e voltar. Sem isso ele encostava no teto e
-             ficava preso numa volta de loop so -- que e o que se ouvia. */
-          var w = Date.now() / 1000;
-          alvo *= 1 + 0.042 * Math.sin(w * 2.7) + 0.014 * Math.sin(w * 6.1);
-        }
-        alvoRpm = Math.max(MIN, Math.min(MAX, alvo));
+        /* A marcha virou ESTADO. Antes ela saia de uma consulta na tabela: a
+           mais baixa que aguentasse aquela velocidade -- ou seja, sempre a de
+           giro mais alto. Por construcao o motor vivia nos ultimos 20% do
+           conta-giros, e o banco de amostras so via as fatias do topo.
+
+           Agora e caixa de verdade: sobe quando o giro encosta no corte, desce
+           so quando ele afunda. Como a marcha nao cai sozinha assim que a moto
+           alivia, o giro desce junto com a velocidade e o som atravessa o
+           banco inteiro -- que e o que o video de referencia faz.
+
+           A ondulacao senoidal que existia aqui saiu junto. Ela era um remendo
+           pra fingir vida quando a moto ficava cravada no limitador; com a
+           velocidade do jogo modulando de verdade, nao ha mais o que fingir. */
+        var giroEm = function (m) { return MAX * (kmh / TOPO[m - 1]); };
+        while (marcha < TOPO.length && giroEm(marcha) > MAX * SOBE) marcha++;
+        while (marcha > 1 && giroEm(marcha) < MAX * DESCE) marcha--;
+        alvoRpm = Math.max(MIN, Math.min(MAX, giroEm(marcha)));
         return marcha;
       },
       get kmh() { return kmh; },
@@ -1421,6 +1496,7 @@
         if (ligado) return;
         ligado = true;
         rpm = MIN; marcha = 1; subindo = true; alvoRpm = MIN; tocando = -1;
+        ultimaEscolha = -1; quadrosParado = 0;
         master.gain.cancelScheduledValues(ac.currentTime);
         master.gain.setValueAtTime(0.0001, ac.currentTime);
         master.gain.linearRampToValueAtTime(volMax, ac.currentTime + 0.7);
@@ -3748,6 +3824,20 @@
     function passo(dt) {
       if (morto) { tremor *= 0.88; return; }
 
+      /* A velocidade sobe e so sobe, dos 30 km/h da garagem ate os 299 de
+         fabrica: a curva de aceleracao da propria moto, sem nada segurando.
+         Chega a 215 km/h aos 5 s, 284 aos 15, e dai encosta no teto.
+
+         Cheguei a por aqui um modelo de transito -- a moto aliviava pro carro
+         da frente e retomava na pista limpa, como no video de referencia. Era
+         mais fiel, mas nao e o que este jogo quer ser: aqui a moto acelera e
+         voce desvia. Fica registrado que a escolha foi essa, e nao um
+         esquecimento.
+
+         O preco e que depois dos ~20 s o giro para de andar, cravado no
+         limitador. Antes isso travava o som numa fatia so; agora nao trava
+         mais, e o rodizio de textura la no motor que resolve -- veja o
+         comentario em cima de `parado` em passo(). */
       var q = vel / VEL_MAX;
       vel = Math.min(VEL_MAX, vel + ACEL0 * (1 - q * q) * dt);
       /* O mundo anda por aqui. A velocidade da moto e a de fabrica; o ritmo e
